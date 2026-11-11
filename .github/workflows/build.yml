@@ -1,0 +1,271 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: write
+
+env:
+  # Sayt manzili (oxirida / bo'lmasin). Boshqa bo'lsa, shu yerda o'zgartiring.
+  APP_URL: https://peerlinksafe.yusupovanigoraxon1990.workers.dev
+  APP_NAME: PeerLink Safe
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Android loyiha fayllarini yaratish
+        run: |
+          mkdir -p app/src/main/java/uz/peerlink/safe
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-anydpi-v26
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "PeerLinkSafe"
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2g
+          android.useAndroidX=false
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'uz.peerlink.safe'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "uz.peerlink.safe"
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:label="__APP_NAME__"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher"
+                  android:theme="@style/AppTheme"
+                  android:allowBackup="false"
+                  android:usesCleartextTraffic="false">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:windowSoftInputMode="adjustResize"
+                      android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:statusBarColor">#10131C</item>
+                  <item name="android:navigationBarColor">#10131C</item>
+                  <item name="android:windowBackground">#10131C</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/values/colors.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="ic_bg">#1E6BE6</color>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_fg.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:pathData="M32,42 L74,42 M66,34 L74,42 L66,50"
+                  android:strokeColor="#FFFFFF"
+                  android:strokeWidth="6"
+                  android:strokeLineCap="round"
+                  android:strokeLineJoin="round" />
+              <path
+                  android:pathData="M76,66 L34,66 M42,58 L34,66 L42,74"
+                  android:strokeColor="#FFFFFF"
+                  android:strokeWidth="6"
+                  android:strokeLineCap="round"
+                  android:strokeLineJoin="round" />
+          </vector>
+          EOF
+
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_bg" />
+              <foreground android:drawable="@drawable/ic_fg" />
+          </adaptive-icon>
+          EOF
+
+          cat > app/src/main/java/uz/peerlink/safe/MainActivity.java <<'EOF'
+          package uz.peerlink.safe;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.view.ViewGroup;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceError;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private static final String APP_URL = "__APP_URL__";
+              private WebView web;
+              private ValueCallback<Uri[]> filePicker;
+
+              @Override
+              protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  web = new WebView(this);
+                  web.setBackgroundColor(Color.parseColor("#10131C"));
+                  setContentView(web, new ViewGroup.LayoutParams(-1, -1));
+
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setAllowFileAccess(false);
+                  s.setAllowContentAccess(true);
+
+                  web.setLongClickable(false);
+                  web.setOnLongClickListener(v -> true);
+                  web.setHapticFeedbackEnabled(false);
+
+                  web.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
+                          Uri u = r.getUrl();
+                          String host = Uri.parse(APP_URL).getHost();
+                          if (u.getHost() != null && u.getHost().equals(host)) return false;
+                          try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { }
+                          return true;
+                      }
+
+                      @Override
+                      public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
+                          if (!r.isForMainFrame()) return;
+                          String html = "<html><body style='background:#10131c;color:#fff;font-family:sans-serif;text-align:center;padding-top:30vh'>"
+                                  + "<h3>Internet yo'q</h3><p>Ulanishni tekshirib, qayta urinib ko'ring</p>"
+                                  + "<button style='padding:12px 22px;font-size:16px;border:0;border-radius:10px;background:#43a047;color:#fff' "
+                                  + "onclick=\"location.href='" + APP_URL + "'\">Qayta urinish</button></body></html>";
+                          v.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+                      }
+                  });
+
+                  web.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public boolean onShowFileChooser(WebView w, ValueCallback<Uri[]> cb, FileChooserParams p) {
+                          if (filePicker != null) filePicker.onReceiveValue(null);
+                          filePicker = cb;
+                          try {
+                              startActivityForResult(p.createIntent(), 1);
+                          } catch (Exception e) {
+                              filePicker = null;
+                              return false;
+                          }
+                          return true;
+                      }
+                  });
+
+                  if (b == null) web.loadUrl(APP_URL); else web.restoreState(b);
+              }
+
+              @Override
+              protected void onActivityResult(int req, int res, Intent data) {
+                  super.onActivityResult(req, res, data);
+                  if (req == 1 && filePicker != null) {
+                      filePicker.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
+                      filePicker = null;
+                  }
+              }
+
+              @Override
+              protected void onSaveInstanceState(Bundle out) {
+                  super.onSaveInstanceState(out);
+                  web.saveState(out);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (web.canGoBack()) web.goBack(); else super.onBackPressed();
+              }
+          }
+          EOF
+
+          sed -i "s|__APP_URL__|${APP_URL}|g" app/src/main/java/uz/peerlink/safe/MainActivity.java
+          sed -i "s|__APP_NAME__|${APP_NAME}|g" app/src/main/AndroidManifest.xml
+
+      - name: APK yig'ish
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Fayl nomini tayyorlash
+        run: cp app/build/outputs/apk/debug/app-debug.apk PeerLinkSafe.apk
+
+      - name: Artifact sifatida saqlash
+        uses: actions/upload-artifact@v4
+        with:
+          name: PeerLinkSafe-apk
+          path: PeerLinkSafe.apk
+
+      - name: Releases bo'limiga joylash (to'g'ridan-to'g'ri yuklab olish uchun)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: PeerLink Safe APK
+          files: PeerLinkSafe.apk
+          make_latest: true
