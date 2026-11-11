@@ -181,6 +181,7 @@ jobs:
                   s.setDomStorageEnabled(true);
                   s.setAllowFileAccess(false);
                   s.setAllowContentAccess(true);
+                  s.setTextZoom(100);
 
                   web.setLongClickable(false);
                   web.setOnLongClickListener(v -> true);
